@@ -1,8 +1,8 @@
 streamlit
 torch
 transformers
+huggingface_hub
 scikit-learn
 pandas
 numpy
 matplotlib
-
