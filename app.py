@@ -12,13 +12,15 @@ st.set_page_config(
     layout="wide"
 )
 
-HF_MODEL_PATH = "Kisantini/SMS-Spam-Detection/sms_spam_distilbert_model"
+# ✅ HuggingFace repo + subfolder
+HF_REPO_ID = "Kisantini/SMS-Spam-Detection"
+HF_SUBFOLDER = "sms_spam_distilbert_model"
 
 # ---------------- LOAD MODEL ----------------
 @st.cache_resource
 def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_PATH)
-    model = AutoModelForSequenceClassification.from_pretrained(HF_MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(HF_REPO_ID, subfolder=HF_SUBFOLDER)
+    model = AutoModelForSequenceClassification.from_pretrained(HF_REPO_ID, subfolder=HF_SUBFOLDER)
     model.eval()
     return tokenizer, model
 
@@ -86,32 +88,23 @@ if menu == "Single SMS Analysis":
             else:
                 st.success("✅ Classified as HAM")
 
-            # Confidence Bar
             st.write("### Prediction Confidence")
             st.progress(confidence)
             st.write(f"Confidence Score: **{confidence:.2f}**")
 
-            # Explanation
             matched_keywords = [w for w in spam_keywords if w in text.lower()]
             st.write("### Explanation")
             if matched_keywords:
-                st.write(
-                    "The message contains suspicious keywords:",
-                    ", ".join(matched_keywords)
-                )
+                st.write("The message contains suspicious keywords:", ", ".join(matched_keywords))
             else:
-                st.write(
-                    "The message does not contain common spam-related keywords."
-                )
+                st.write("The message does not contain common spam-related keywords.")
 
-            # Save history
             st.session_state.history.append([text, label, round(confidence, 2)])
 
 # ================= BULK SMS =================
 elif menu == "Bulk SMS Analysis":
     st.title("📂 Bulk SMS Analysis")
     st.write("Upload a CSV file to classify multiple SMS messages.")
-
     st.info("CSV file must include a column named **message**")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
@@ -139,7 +132,6 @@ elif menu == "Bulk SMS Analysis":
                 st.subheader("Prediction Results")
                 st.dataframe(df)
 
-                # Download
                 csv = df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     "⬇️ Download Results",
@@ -163,7 +155,6 @@ elif menu == "Analytics Dashboard":
         st.subheader("Prediction Summary")
         st.dataframe(hist_df)
 
-        # Count plot
         counts = hist_df["Prediction"].value_counts()
 
         fig, ax = plt.subplots()
@@ -184,7 +175,8 @@ else:
     The objective is to automatically classify SMS messages as **Spam** or **Ham**.
 
     **Model Source**
-    - `{HF_MODEL_PATH}`
+    - Repo: `{HF_REPO_ID}`
+    - Subfolder: `{HF_SUBFOLDER}`
 
     **Models Implemented**
     - Naive Bayes with TF-IDF (Baseline)
