@@ -12,9 +12,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# ✅ HuggingFace repo + subfolder
+# ---------------- HF MODEL LOCATION ----------------
+# Repo ID on HuggingFace
 HF_REPO_ID = "Kisantini/SMS-Spam-Detection"
+
+# Folder inside your HF repo that contains config.json, pytorch_model.bin, tokenizer files, etc.
 HF_SUBFOLDER = "sms_spam_distilbert_model"
+
 
 # ---------------- LOAD MODEL ----------------
 @st.cache_resource
@@ -24,7 +28,9 @@ def load_model():
     model.eval()
     return tokenizer, model
 
+
 tokenizer, model = load_model()
+
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("📩 SMS Scam Detection")
@@ -41,8 +47,11 @@ spam_keywords = [
     "limited", "congratulations", "claim", "reward"
 ]
 
+
 # ---------------- PREDICTION FUNCTION ----------------
-def predict_sms(text):
+def predict_sms(text: str):
+    text = str(text)
+
     inputs = tokenizer(
         text,
         return_tensors="pt",
@@ -57,12 +66,17 @@ def predict_sms(text):
         pred = torch.argmax(probs, dim=1).item()
         confidence = probs[0][pred].item()
 
+    # ⚠️ Assumption:
+    # label 1 = Spam, label 0 = Ham
     label = "Spam" if pred == 1 else "Ham"
+
     return label, confidence, probs.squeeze().tolist()
+
 
 # ---------------- SESSION HISTORY ----------------
 if "history" not in st.session_state:
     st.session_state.history = []
+
 
 # ================= SINGLE SMS =================
 if menu == "Single SMS Analysis":
@@ -75,7 +89,7 @@ if menu == "Single SMS Analysis":
         placeholder="Example: Congratulations! You have won a free prize."
     )
 
-    if st.button("Analyze"):
+    if st.button("Analyze", type="primary"):
         if text.strip() == "":
             st.warning("Please enter a message.")
         else:
@@ -88,23 +102,35 @@ if menu == "Single SMS Analysis":
             else:
                 st.success("✅ Classified as HAM")
 
+            # Confidence progress bar (0 to 1)
             st.write("### Prediction Confidence")
-            st.progress(confidence)
-            st.write(f"Confidence Score: **{confidence:.2f}**")
+            st.progress(float(confidence))
+            st.write(f"Confidence Score: **{confidence * 100:.2f}%**")
 
+            # Keyword explanation
             matched_keywords = [w for w in spam_keywords if w in text.lower()]
+
             st.write("### Explanation")
             if matched_keywords:
-                st.write("The message contains suspicious keywords:", ", ".join(matched_keywords))
+                st.write("The message contains suspicious keywords:")
+                st.write(", ".join(matched_keywords))
             else:
                 st.write("The message does not contain common spam-related keywords.")
 
-            st.session_state.history.append([text, label, round(confidence, 2)])
+            # Optional: show class probabilities
+            st.write("### Class Probabilities")
+            st.write(f"Ham Probability: **{probs[0] * 100:.2f}%**")
+            st.write(f"Spam Probability: **{probs[1] * 100:.2f}%**")
+
+            # Save history
+            st.session_state.history.append([text, label, round(confidence, 4)])
+
 
 # ================= BULK SMS =================
 elif menu == "Bulk SMS Analysis":
     st.title("📂 Bulk SMS Analysis")
     st.write("Upload a CSV file to classify multiple SMS messages.")
+
     st.info("CSV file must include a column named **message**")
 
     file = st.file_uploader("Upload CSV", type=["csv"])
@@ -115,9 +141,10 @@ elif menu == "Bulk SMS Analysis":
         if "message" not in df.columns:
             st.error("CSV must contain a 'message' column.")
         else:
+            st.subheader("Preview File")
             st.dataframe(df.head())
 
-            if st.button("Run Analysis"):
+            if st.button("Run Analysis", type="primary"):
                 preds = []
                 confidences = []
 
@@ -132,6 +159,7 @@ elif menu == "Bulk SMS Analysis":
                 st.subheader("Prediction Results")
                 st.dataframe(df)
 
+                # Download results
                 csv = df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     "⬇️ Download Results",
@@ -140,21 +168,23 @@ elif menu == "Bulk SMS Analysis":
                     "text/csv"
                 )
 
+
 # ================= ANALYTICS =================
 elif menu == "Analytics Dashboard":
     st.title("📊 Analytics Dashboard")
 
     if len(st.session_state.history) == 0:
-        st.info("No predictions available yet.")
+        st.info("No predictions available yet. Please analyze some messages first.")
     else:
         hist_df = pd.DataFrame(
             st.session_state.history,
             columns=["Message", "Prediction", "Confidence"]
         )
 
-        st.subheader("Prediction Summary")
+        st.subheader("Prediction History")
         st.dataframe(hist_df)
 
+        st.subheader("Spam vs Ham Distribution")
         counts = hist_df["Prediction"].value_counts()
 
         fig, ax = plt.subplots()
@@ -163,6 +193,7 @@ elif menu == "Analytics Dashboard":
         ax.set_ylabel("Count")
         ax.set_xlabel("Class")
         st.pyplot(fig)
+
 
 # ================= ABOUT =================
 else:
@@ -175,7 +206,7 @@ else:
     The objective is to automatically classify SMS messages as **Spam** or **Ham**.
 
     **Model Source**
-    - Repo: `{HF_REPO_ID}`
+    - HuggingFace Repo: `{HF_REPO_ID}`
     - Subfolder: `{HF_SUBFOLDER}`
 
     **Models Implemented**
@@ -183,13 +214,14 @@ else:
     - DistilBERT Transformer (Proposed)
 
     **Key Features**
-    - Single and bulk SMS classification
+    - Single SMS classification
+    - Bulk SMS classification using CSV upload
     - Confidence-based predictions
-    - Interactive analytics dashboard
+    - Simple analytics dashboard
 
     **Limitations**
-    - Performance depends on dataset size
-    - Transformer models require careful tuning for short-text data
+    - Depends on dataset quality and diversity
+    - Transformer models require more compute than classical ML
 
     **Future Enhancements**
     - Scam type classification
